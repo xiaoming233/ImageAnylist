@@ -11,10 +11,8 @@ from PIL import Image
 import time
 
 
-MPEG1VIDEO = 0x314D4950
+
 camera = cv2.VideoCapture(0)#找摄像头，一般填0-99都可以
-
-
 class MainWindow(QWidget):
     def __init__(self, parent = None):
         QWidget.__init__(self)
@@ -23,6 +21,10 @@ class MainWindow(QWidget):
         self.status = 0 #0 is init status;1 is play video; 2 is capture video
         self.image = QImage()
         
+        self.count=1
+        #self.MPEG1VIDEO = 0x314D4950
+        
+        self.rootPath='E:\\Python\\videoDemo\\image\\'
         #录制的视频保存位置、格式等参数设定
         #self.videowriter =  cv2.VideoWriter("test.mpg", cv2.VideoWriter_fourcc('m','p','g','1'), 25, (640,480))
         self.videowriter =  cv2.VideoWriter("test.avi", cv2.VideoWriter_fourcc('I','4','2','0'), 25, (640,480))
@@ -134,7 +136,8 @@ class MainWindow(QWidget):
         #pic.load('3.jpg')
             #self.image.load("3.jpg")
             self.piclabel.setPixmap(QPixmap.fromImage(self.image))  #一帧一帧的显示
-            
+            cv2.imwrite(self.rootPath+str(self.count)+'.jpg',self.image)
+            self.count+=1
     
 class Timer(QThread):
     _signal= pyqtSignal(str)
@@ -152,7 +155,7 @@ class Timer(QThread):
             if self.stoped:
                 return
             self._signal.emit(self.signal)
-            time.sleep(0.04) #40毫秒发送一次信号，每秒25帧
+            time.sleep(1) #40毫秒发送一次信号，每秒25帧
     
     def stop(self):
         with QMutexLocker(self.mutex):

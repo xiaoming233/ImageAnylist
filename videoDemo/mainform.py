@@ -18,7 +18,7 @@ from PyQt5.QtCore import QMutex,QMutexLocker,QThread,pyqtSignal,Qt
 import time
 
 
-rootPath='E:\\Python\\videoDemo\\image\\'
+rootPath='C:\\Users\\ljm\\Desktop\\test\\'
 
 
 class MainWindow(QWidget):
@@ -100,11 +100,11 @@ class MainWindow(QWidget):
         #cv2.imshow("image", im)
         #cv2.imshow("Thresh", thresh)
         #cv2.imshow("Image Delta", ImageDelta)
-        if self.im_video is not None :
+            if self.im_video is not None :
             #cv2.imshow("im_video", im_video)
-            cv2.imwrite(rootPath+str(self.count)+'.jpg',self.im_video)
-        self.count+=1
-        self.time+=1
+                cv2.imwrite(rootPath+str(self.count)+'.jpg',self.im_video)
+                self.count+=1
+                self.time+=1
         
             
     
@@ -124,7 +124,7 @@ class Timer(QThread):
             if self.stoped:
                 return
             self._signal.emit(self.signal)
-            time.sleep(2) #40毫秒发送一次信号，每秒25帧
+            time.sleep(1) #40毫秒发送一次信号，每秒25帧
     
     def stop(self):
         with QMutexLocker(self.mutex):
@@ -154,7 +154,10 @@ class Timer(QThread):
     
     
 if __name__ == "__main__" :
-    app = QApplication(sys.argv)
+    if not QApplication.instance():
+        app = QApplication(sys.argv)
+    else:
+        app = QApplication.instance() 
     main = MainWindow()
     main.show()
     sys.exit(app.exec_())

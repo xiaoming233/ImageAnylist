@@ -5,46 +5,57 @@ Created on Mon Jul 24 08:57:19 2017
 @author: ljm
 """
 
-import sys
+
 import cv2
 from PIL import ImageGrab
 import numpy as np
-from PyQt5.QtWidgets import (QMainWindow,QApplication, QWidget, QVBoxLayout,QHBoxLayout,
-                             QLabel,QPushButton,QAction,qApp,QFileDialog)
-from PyQt5.QtGui import QImage,QPixmap,QIcon
-from PyQt5.QtCore import QMutex,QMutexLocker,QThread,pyqtSignal,Qt
+from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                             QLabel, QPushButton, QAction, QFileDialog)
+from PyQt5.QtGui import QImage, QPixmap, QIcon
+from PyQt5.QtCore import QMutex, QMutexLocker, QThread, pyqtSignal, Qt
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 import time
-import ImagePathHander as imp
+from suds.client import Client
+import base64
+import os.path
+from ImagePath import ImagePath
 
 rootPath='E:\\Python\\videoDemo\\image\\'
 
 
 class MainWindow(QMainWindow):
     def __init__(self, parent = None):
-        QWidget.__init__(self)
-        self.resize(550, 550)
-        self.setWindowTitle('鼻内镜影像智能分析系统')
-        self.setWindowFlags(self.windowFlags()|Qt.WindowStaysOnTopHint)
+        super().__init__()
         self.status = 0 #0 is init status;1 is capture screen
         
-        self.imPath=imp.ImagePath('path.conf')
-        self.imgeDirPath=self.imPath.getPath
+        self.imPath=ImagePath('path.conf')
+        self.imDirPath= self.imPath.getPath()
         self.firstImage=None
         self.count=1
         self.im_video=None
         self.time=0
+        self.observer = Observer()
+        #self.imageOnCreateEventHander()
+        self.initUI()
+   
+    def initUI(self):
+        self.resize(550, 550)
+        self.setWindowTitle('鼻内镜影像智能分析系统')
+        self.setWindowFlags(self.windowFlags()|Qt.WindowStaysOnTopHint)
+        
         self.image = QImage()
         
         menuAction = QAction(QIcon('C:\\Users\\ljm\\Anaconda3\\Lib\\site-packages\\spyder\\images\\actions\\browse_tab.png'), '&设置路径', self)
         menuAction.setStatusTip('设置目标文件夹路径')
         menuAction.triggered.connect(self.showPathDialog)
-
+        
         #菜单
         menubar = self.menuBar()
-        fileMenu = menubar.addMenu('&文件')
+        fileMenu = menubar.addMenu('&文件') #         
         fileMenu.addAction(menuAction)
         #图片
-        self.piclabel = QLabel('pic')
+        self.piclabel = QLabel(self)
         
         #初始化按钮
         self.capturebtn = QPushButton('capture')
@@ -54,15 +65,20 @@ class MainWindow(QMainWindow):
         hbox = QHBoxLayout()
         hbox.addWidget(self.capturebtn)
         hbox.addWidget(self.label)
+        hbox.addStretch(1)
         
         vbox = QVBoxLayout()
         vbox.addWidget(self.piclabel)
+        #vbox.addStretch(1)
         vbox.addLayout(hbox)
-        self.setLayout(vbox)
-        
+        cetralWidget= QWidget(self)
+        cetralWidget.setLayout(vbox)
+        self.setCentralWidget(cetralWidget)
+
+
         #加载初始页面
-        if self.image.load("1.jpg"):  
-            self.piclabel.setPixmap(QPixmap.fromImage(self.image))
+        if self.image.load("1.jpg"):
+           self.piclabel.setPixmap(QPixmap.fromImage(self.image))
         #设定定时器
         self.timer = Timer() #录制视频 
         
@@ -70,22 +86,36 @@ class MainWindow(QMainWindow):
         self.capturebtn.clicked.connect(self.PauseBegin)
         self.timer._signal.connect(self.CaptureScreen)
         
+
+        
     def showPathDialog(self):
-        dir_path = QFileDialog.getExistingDirectory(self,"选择图像文件夹...",'./')
-        self.imgeDirPath=dir_path
-        self.imPath=imp.ImagePath('path.conf')
+        dir_path = QFileDialog.getExistingDirectory(self,"选择图像文件夹...", '/')
+        self.imDirPath=dir_path
         self.imPath.setPath(dir_path )
     def keyPressEvent(self, e):
         if e.key() == Qt.Key_F12:
             self.PauseBegin()
             
     def PauseBegin(self):
+
+        if not self.imDirPath.strip():
+            self.showPathDialog()
         self.status,  capturestr = ((1, 'pause'), (0,  'capture'))[self.status]
         self.capturebtn.setText(capturestr)
-        if self.status is 1:#状态0，截屏           
-            self.timer.start()
+        if self.status is 1:
+            self.observer = Observer()
+            self.imageOnCreateEventHander()
+            self.observer.start()
+            # if self.observer.is_alive:
+            #     self.observer.run()
+            # else:
+            #     self.observer.start()
+            #self.timer.start()
         else:
-            self.timer.stop()
+            
+            self.observer.stop()
+        
+            #self.timer.stop()
         
         
     def CaptureScreen(self):
@@ -129,6 +159,19 @@ class MainWindow(QMainWindow):
             cv2.imwrite(rootPath+str(self.count)+'.jpg',self.im_video)
         self.count+=1
         self.time+=1
+
+    def imageOnCreateEvent(self, event):
+        if not event.is_directory:
+            fileUpload=FileUpload(event.src_path);
+            fileUpload.start()
+            self.piclabel.setPixmap(QPixmap(event.src_path))
+
+    def imageOnCreateEventHander(self):
+        #监测图像文件的生成
+        self.fileEventHander = FileSystemEventHandler()
+        self.fileEventHander.on_created = self.imageOnCreateEvent
+        self.observer.schedule(self.fileEventHander, self.imDirPath, recursive=True)
+
         
             
     
@@ -173,15 +216,17 @@ class Timer(QThread):
 #         self.hm.HookKeyboard()
 #         pythoncom.PumpMessages()
 #==============================================================================
+class FileUpload(QThread):
 
+    def __init__(self, file_path, parent=None):
+        super(FileUpload, self).__init__(parent)
+        self.file_path = file_path
+
+    def run(self):
+        file = open(self.file_path, 'rb')
+        file_data = base64.b64encode(file.read())
+        client = Client('http://localhost:9000/?wsdl')
+        client.service.add(os.path.basename(self.file_path), file_data)
 
     
     
-if __name__ == "__main__" :
-    if not QApplication.instance():
-        app = QApplication(sys.argv)
-    else:
-        app = QApplication.instance() 
-    main = MainWindow()
-    main.show()
-    sys.exit(app.exec_())
