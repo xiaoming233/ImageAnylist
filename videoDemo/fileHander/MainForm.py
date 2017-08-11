@@ -20,6 +20,7 @@ from suds.client import Client
 import base64
 import os.path
 from ImagePath import ImagePath
+import requests
 
 rootPath='E:\\Python\\videoDemo\\image\\'
 
@@ -162,8 +163,22 @@ class MainWindow(QMainWindow):
 
     def imageOnCreateEvent(self, event):
         if not event.is_directory:
-            fileUpload=FileUpload(event.src_path);
-            fileUpload.start()
+            #fileUpload=FileUpload(event.src_path);
+            #fileUpload.start()
+            # file = open(event.src_path, 'rb')
+            # file_data = base64.b64encode(file.read())
+            # client = Client('http://localhost:9000/?wsdl')
+            # client.service.add(os.path.basename(event.src_path), file_data)
+            try:
+                url = 'http://localhost:8088'
+                # path = u'test2.jpg'
+                # print(path)
+                with open(event.src_path, 'rb') as im:
+                    files = {'file': im}
+                r = requests.post(url, files=files)
+                print(r.content)
+            except:
+                pass
             self.piclabel.setPixmap(QPixmap(event.src_path))
 
     def imageOnCreateEventHander(self):
