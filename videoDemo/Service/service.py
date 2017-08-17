@@ -7,6 +7,9 @@ Created on Web Augus 9 15:10:32 2017
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import cgi
 import os
+import naso_demo
+import json
+import numpy as np
 class PostHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         form = cgi.FieldStorage(
@@ -29,8 +32,12 @@ class PostHandler(BaseHTTPRequestHandler):
             path = os.path.join(os.path.abspath('./Images'), filename)
             with open(path, 'wb') as f:
                 f.write(filevalue)
+                preds=naso_demo('/opt/lampp/htdocs/pic/inV3-malignant-ds.hdf5',path)
+            for pred in enumerate(preds):
+                self.wfile.write(bytes([{'result:', np.argmax(pred), 'confidence:', np.max(pred)}], 'utf8'))
+        # print(i + 1, 'result:', np.argmax(pred), 'confidence:', np.max(pred))
         return
 if __name__=='__main__':
-    sever = HTTPServer(('localhost',8088),PostHandler)
+    sever = HTTPServer(('192.168.40.100',8088),PostHandler)
     print ('Starting server, use <Ctrl-C> to stop')
     sever.serve_forever()

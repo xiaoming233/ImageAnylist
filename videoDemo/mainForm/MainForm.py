@@ -10,7 +10,7 @@ import cv2
 from PIL import ImageGrab
 import numpy as np
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                             QLabel, QPushButton, QAction, QFileDialog)
+                             QLabel, QPushButton, QAction, QFileDialog,QComboBox)
 from PyQt5.QtGui import QImage, QPixmap, QIcon
 from PyQt5.QtCore import QMutex, QMutexLocker, QThread, pyqtSignal, Qt
 from watchdog.observers import Observer
@@ -21,7 +21,7 @@ import base64
 import os.path
 from Config import ConfigHander
 import requests
-import CaptureHander
+from RectangleHander import RecSetForm
 
 rootPath='E:\\Python\\videoDemo\\image\\'
 
@@ -31,8 +31,9 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.status = 0 #0 is init status;1 is capture screen
         
-        self.imPath=ConfigHander('config.conf')
-        self.imDirPath= self.imPath.getImDirPath()
+        config=ConfigHander('config.conf')
+        self.imDirPath= config.getImDirPath()
+        self.box= tuple(eval(config.getRectangleSize()))
         self.firstImage=None
         self.count=1
         self.im_video=None
@@ -44,34 +45,43 @@ class MainWindow(QMainWindow):
     def initUI(self):
         self.resize(550, 550)
         self.setWindowTitle('鼻内镜影像智能分析系统')
-        self.setWindowFlags(self.windowFlags()|Qt.WindowStaysOnTopHint)
+        # self.setWindowFlags(self.windowFlags()|Qt.WindowStaysOnTopHint)
         
         self.image = QImage()
         
         menuDirPath = QAction(QIcon('icon\\browse_tab.png'), '&设置路径', self)
-        menuDirPath.setStatusTip('设置目标文件夹路径')
+        menuDirPath.setStatusTip('设置目标图像文件夹路径')
         menuDirPath.triggered.connect(self.showPathDialog)
-        menuRectangle = QAction(QIcon('icon\\bexpand_selection.png'), '&设置矩形区域', self)
+        menuRectangle = QAction(QIcon('icon\\expand_selection.png'), '&设置矩形区域', self)
         menuRectangle.setStatusTip('设置截图的矩形区域')
-        menuRectangle.triggered.connect(self.showRecSetForm())
+        menuRectangle.triggered.connect(self.showRecSetForm)
         #菜单
         menubar = self.menuBar()
         fileMenu = menubar.addMenu('&文件') #         
         fileMenu.addAction(menuDirPath)
         fileMenu.addAction(menuRectangle)
+
         #图片
         self.piclabel = QLabel(self)
         
         #初始化按钮
-        self.capturebtn = QPushButton('capture')
-        self.label=QLabel('capture/pause:F12')
-        
+        self.capturebtn = QPushButton('开始')
+        self.capturelbe=QLabel('开始/停止:F12')
+        self.resultlbe=QLabel('结果：')
+
+        self.combobox = QComboBox(self)
+        self.combobox.addItem('从文件夹读取')
+        self.combobox.addItem('手动截图')
+        self.combobox.addItem('自动截图')
         # 界面布局
         hbox = QHBoxLayout()
+        hbox.addWidget(self.combobox)
         hbox.addWidget(self.capturebtn)
-        hbox.addWidget(self.label)
+        hbox.addWidget(self.capturelbe)
+        hbox.addSpacing(30)
+        hbox.addWidget(self.resultlbe)
         hbox.addStretch(1)
-        
+
         vbox = QVBoxLayout()
         vbox.addWidget(self.piclabel)
         #vbox.addStretch(1)
@@ -85,47 +95,71 @@ class MainWindow(QMainWindow):
         if self.image.load("1.jpg"):
            self.piclabel.setPixmap(QPixmap.fromImage(self.image))
         #设定定时器
-        self.timer = Timer() #录制视频 
-        
+        self.timerAuto = Timer('Auto',2) #自动截图
+        self.timerManual = Timer('Manual',5)  # 手动截图
         #信号--槽
-        self.capturebtn.clicked.connect(self.PauseBegin)
-        self.timer._signal.connect(self.CaptureScreen)
-        
+        self.capturebtn.clicked.connect(self.pauseBegin)
+        self.timerAuto._signal.connect(self.captureScreenAuto)
+        self.timerManual._signal.connect(self.captureScreenManual)
 
-        
     def showPathDialog(self):
         dir_path = QFileDialog.getExistingDirectory(self,"选择图像文件夹...", '/')
         self.imDirPath=dir_path
-        self.imPath.setImDirPath(dir_path )
+        self.config.setImDirPath(dir_path )
+
     def showRecSetForm(self):
-        CaptureHander.CaptureForm()
+        self.hide()
+        app = RecSetForm()
+        app.mainloop()
+        config = ConfigHander('config.conf')
+        self.box = tuple(eval(config.getRectangleSize()))
+        self.show()
+
     def keyPressEvent(self, e):
         if e.key() == Qt.Key_F12:
-            self.PauseBegin()
+            self.pauseBegin()
             
-    def PauseBegin(self):
-
+    def pauseBegin(self):
         if not self.imDirPath.strip():
             self.showPathDialog()
-        self.status,  capturestr = ((1, 'pause'), (0,  'capture'))[self.status]
+        self.status,  capturestr = ((1, '停止'), (0,  '开始'))[self.status]
         self.capturebtn.setText(capturestr)
         if self.status is 1:
-            self.observer = Observer()
-            self.imageOnCreateEventHander()
-            self.observer.start()
-            # if self.observer.is_alive:
-            #     self.observer.run()
-            # else:
-            #     self.observer.start()
-            #self.timer.start()
+            if self.combobox.currentText()=='从文件夹读取':
+                # self.observer = Observer()
+                # self.imageOnCreateEventHander()
+                # self.observer.start()
+                self.resultlbe.setText(self.combobox.currentText())
+            elif self.combobox.currentText()=='手动截图':
+                # self.timerManual.start()
+                self.resultlbe.setText(self.combobox.currentText())
+            elif self.combobox.currentText() == '自动截图':
+                # self.timerManual.start()
+                self.resultlbe.setText(self.combobox.currentText())
+            self.combobox.setDisabled(True)
         else:
-            
-            self.observer.stop()
-        
+
+            if self.combobox.currentText()=='从文件夹读取':
+                pass
+                # self.observer.stop()
+            elif self.combobox.currentText()=='手动截图':
+                pass
+                # self.timerManual.stop()
+            elif self.combobox.currentText() == '自动截图':
+                pass
+                # self.timerManual.stop()
+            self.combobox.setDisabled(False)
+
             #self.timer.stop()
-        
-        
-    def CaptureScreen(self):
+
+    def captureScreenManual(self):
+
+        im = ImageGrab.grab(self.box)
+        im.save('134.jpeg')
+        #self.piclabel.setPixmap(im)
+
+
+    def captureScreenAuto(self):
         im = ImageGrab.grab()
         im= np.array(im)
         cv2.cvtColor(im, cv2.COLOR_RGB2BGR, im)
@@ -198,12 +232,12 @@ class MainWindow(QMainWindow):
     
 class Timer(QThread):
     _signal= pyqtSignal(str)
-    def __init__(self, signal = "updateTime", parent=None):
+    def __init__(self, signal = "Timer", period=0.04,parent=None):
         super(Timer, self).__init__(parent)
         self.stoped = False
         self.signal = signal
         self.mutex = QMutex()
-
+        self.period=period
 
     def run(self):
         with QMutexLocker(self.mutex):
@@ -212,7 +246,7 @@ class Timer(QThread):
             if self.stoped:
                 return
             self._signal.emit(self.signal)
-            time.sleep(2) #40毫秒发送一次信号，每秒25帧
+            time.sleep(self.period) #默认40毫秒发送一次信号，每秒25帧
     
     def stop(self):
         with QMutexLocker(self.mutex):

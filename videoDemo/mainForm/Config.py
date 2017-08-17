@@ -24,12 +24,12 @@ class ConfigHander:
                 print("Unexpected error:", sys.exc_info()[0])
 
     def getRectangleSize(self):
-        path= self.conf.get('Rectangle', 'value')
-        return path
-    def setRectangleSize(self, size):
-        if size != '':
+        box= self.conf.get('Rectangle', 'value')
+        return box
+    def setRectangleSize(self, box):
+        if box != '':
             try:
-                self.conf.set('Rectangle', 'value', size)
+                self.conf.set('Rectangle', 'value', box)
                 self.conf.write(open(self.filepath, 'w'))
             except:
                 print("Unexpected error:", sys.exc_info()[0])

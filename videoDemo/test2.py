@@ -10,7 +10,7 @@ import base64
 import cv2
 import io
 from PIL import Image
-
+print('-' * 10)
 with open('test.JPG', 'rb') as file:
     file_data = base64.b64encode(file.read())
     print(type(file_data))
