@@ -1,6 +1,6 @@
 # ImageAnylist
 python
-#Requirement
+# Requirement
 client:OpenCV-python;PyQt5;requests;tkinter;watchdog
 
 # 说明
