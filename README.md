@@ -2,6 +2,7 @@
 python
 # Requirement
 client:python3;OpenCV-python;PyQt5;requests;tkinter;watchdog.
+
 server:pyhton3.
 # Instructions 
 1)	Select "read from the images' folder ", "automatically distinguish screenshots" or "manual  screenshots".
